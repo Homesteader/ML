@@ -18,28 +18,26 @@ end
 function KabalaAStarPath:getPath()
 
     print("getPathgetPathgetPathgetPathgetPathgetPath")
-    --[[for k,v in pairs(self.closeTable) do
-        print(k,v.x,v.y)
-    end
-    print("******************************************")
-    local path = {}
+
+    local reversePath = {}       
+    reversePath[1] = self.closeTable[#self.closeTable]
     local index = 1
-    while(true) do
-        local cur = self.closeTable[index]
-        table.insert(path,cur)
-        if index == #self.closeTable then
-            break
+    local p = self.closeTable[#self.closeTable].parent
+    for i=#self.closeTable-1,1,-1 do
+        if p.x == self.closeTable[i].x and p.y == self.closeTable[i].y then
+            index = index + 1
+            p = self.closeTable[i].parent
+            reversePath[index] = self.closeTable[i]
         end
-        print("index",index)
-        for i=index + 1,#self.closeTable do
-            local around = self:getAroundTileds(cur)
-            local inaround = self:isExitInTable(around,self.closeTable[i])
-            if inaround then
-                index = i
-            end
-        end
-    end]]
-    return self.closeTable
+    end
+
+    self.path = {}
+    for i = 1, #reversePath do
+        local key = #reversePath
+        self.path[i] = table.remove(reversePath)
+    end
+
+    return self.path
 end
 
 --得到周围格子
@@ -85,20 +83,21 @@ end
 function KabalaAStarPath:getMinFTiled(lastTiled)
 
     local minF = math.huge
-    local minTiled
+    local minTiled,index
     for k,v in ipairs(self.openTable) do
         if v.valueF < minF then
             minF = v.valueF
             minTiled = v
+            index = k
         end
     end
 
-    return minTiled
+    return minTiled,k
 end
 
 function KabalaAStarPath:isExitInTable(tiledTable,tiled)
 
-    for i=#tiledTable,1,-1 do
+    for i=1,#tiledTable do
         if tiled.x == tiledTable[i].x and tiled.y == tiledTable[i].y then
             return i
         end
@@ -114,44 +113,42 @@ function KabalaAStarPath:equals(tiled1,tiled2)
     return false
 end
 
-
 function KabalaAStarPath:findAStarPath()
 
     self.openTable = {}
-    self.closeTable = {}
-    local success = false
-    local lastTile
+    self.closeTable = {}    
     table.insert(self.openTable,{x = self.srcTiled.x,y = self.srcTiled.y,valueG = 0, valueH = 0, valueF = 0, parent = nil})
+
     while next(self.openTable) do
+
         local curTiled = self:getMinFTiled()
         table.insert(self.closeTable,curTiled)
         local index = self:isExitInTable(self.openTable,curTiled)
         table.remove(self.openTable,index)
+
         local aroundTab = self:getAroundTileds(ccp(curTiled.x,curTiled.y))
         for k,v in ipairs(aroundTab) do
             if self:equals(v,self.desTiled) then
-                table.insert(self.closeTable,self.desTiled)           
+                table.insert(self.closeTable,{x = self.desTiled.x,y = self.desTiled.y, parent = curTiled})           
                 return true
             end
 
             --判断是否在closeTab
             if not self:isExitInTable(self.closeTable,v) then
 
+                local valueG = curTiled.valueG + self:calcValueDis(curTiled, v)
+                local valueH = self:calcValueDis(v,self.desTiled)
+                local valueF = valueG + valueH
+
                 local index = self:isExitInTable(self.openTable,v)
                 if not index then
-
-                    local valueG = self:calcValueDis(curTiled,self.srcTiled)
-                    local valueH = self:calcValueH(v,self.desTiled)
-                    local valueF = valueG + valueH
                     local tiledInfo = {x = v.x,y = v.y,valueG = valueG, valueH = valueH, valueF = valueF, parent = curTiled}
                     table.insert(self.openTable,tiledInfo)
                 else
-                    local tiledInOpenTab = self.openTable[index]
-                    local tempG = self:calcValueDis(curTiled, tiledInOpenTab) + curTiled.valueG
-                    if tempG <= tiledInOpenTab.valueG then
+                    local tiledInOpenTab = self.openTable[index]                    
+                    if valueG < tiledInOpenTab.valueG then
                         tiledInOpenTab.parent = curTiled
-                        tiledInOpenTab.valueG = tempG
-                        tiledInOpenTab.valueF = tiledInOpenTab.valueH + tempG
+                        tiledInOpenTab.valueG = valueG                        
                     end
                 end
             end
